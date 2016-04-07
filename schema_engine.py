@@ -90,6 +90,7 @@ class SchemaNode:
         self.all_parents_cached = None
         self.long_alias_cached = None
         self.external_name_cached = None
+        self.name_components_cached = None
         self.name = None
         self.value = None
         self.reference = None
@@ -178,6 +179,14 @@ class SchemaNode:
                 child.value = idnode.value
                 child.reference = idnode
                 self.children.append(child)
+
+    def name_components(self):
+        if self.name_components_cached is not None:
+            return self.name_components_cached
+        components = [i.name for i in self.all_parents()[1:] if i.name]
+        self.name_components_cached = components
+        return components
+
 
 #methods related to naming conventions
 
@@ -316,7 +325,6 @@ class DataEngine:
         if node.reference:
             return self.get_current_record_data(node.reference)
         curdata = self.data
-        components = [i.name for i in node.all_parents()[1:] if i.name]
         component_idx = 0
 
         for parnode in node.all_parents():
@@ -329,7 +337,7 @@ class DataEngine:
                 if type(curdata) is bson.objectid.ObjectId:
                     pass
                 else:
-                    fieldname = components[component_idx]
+                    fieldname = node.name_components()[component_idx]
                     if fieldname in curdata.keys():
                         curdata = curdata[fieldname]
                         component_idx += 1
