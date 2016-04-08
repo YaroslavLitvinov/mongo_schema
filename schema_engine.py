@@ -325,6 +325,7 @@ class DataEngine:
         if node.reference:
             return self.get_current_record_data(node.reference)
         curdata = self.data
+        components = node.name_components()
         component_idx = 0
 
         for parnode in node.all_parents():
@@ -337,7 +338,7 @@ class DataEngine:
                 if type(curdata) is bson.objectid.ObjectId:
                     pass
                 else:
-                    fieldname = node.name_components()[component_idx]
+                    fieldname = components[component_idx]
                     if fieldname in curdata.keys():
                         curdata = curdata[fieldname]
                         component_idx += 1
