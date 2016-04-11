@@ -300,6 +300,18 @@ class DataEngine:
             self.indexes[key_name] = 0
         self.indexes[key_name] += 1
 
+    def load_tables_structure_only_recursively(self, node):
+        """ Do initial sqltables load."""
+        if node.value == node.type_struct:
+            for child in node.children:
+                if child.value == child.type_struct or \
+                   child.value == child.type_array:
+                    self.load_tables_structure_only_recursively(child)
+        elif node.value == node.type_array:
+#if expected and real types are the same
+            self.load_tables_structure_only_recursively(node.children[0])
+            self.callback(self.callback_param, node)
+
     def load_data_recursively(self, data, node):
         """ Do initial data load. Calculate data indexes, 
             exec callback for every new array"""
@@ -359,6 +371,9 @@ def load_table_callback(tables, node):
     if table_name not in tables.tables:
         tables.tables[table_name] = SqlTable(node)
     sqltable = tables.tables[table_name]
+    if tables.data_engine.data is None:
+        #support to load just tables structure w/o data
+        return
     for column_name, column in sqltable.sql_columns.iteritems():
         if column.node.value == column.node.type_array: #index
             idxcolkey = column.node.long_alias()
@@ -402,8 +417,10 @@ class Tables:
 
     def load_all(self):
         root = self.schema_engine.root_node
-#        array = [root] + root.get_nested_array_type_nodes()
-        self.data_engine.load_data_recursively(self.data, root)
+        if self.data is None:
+            self.data_engine.load_tables_structure_only_recursively(root)
+        else:
+            self.data_engine.load_data_recursively(self.data, root)
 
 
 def create_schema_engine(collection_name, schemapath):

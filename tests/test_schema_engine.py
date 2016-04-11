@@ -3,6 +3,7 @@
 import os
 from mongo_schema.schema_engine import create_schema_engine
 from mongo_schema.schema_engine import create_tables_load_file
+from mongo_schema.schema_engine import create_tables_load_bson_data
 
 files = {'a_inserts': ('test_files/json_schema2.txt',
                        'test_files/bson_data2.txt')}
@@ -18,7 +19,10 @@ def get_schema_tables(schema_engine_obj):
     dirpath=os.path.dirname(os.path.abspath(__file__))
     data_fname = files[collection_name][1]
     data_path = os.path.join(dirpath, data_fname)
-    return create_tables_load_file(schema_engine_obj, data_path)
+    tables_with_data = create_tables_load_file(schema_engine_obj, data_path)
+    tables_no_data = create_tables_load_bson_data(schema_engine_obj, None)
+    assert(tables_with_data.tables.keys() == tables_no_data.tables.keys())
+    return tables_with_data
 
 def get_test_node(full_path):
     engine = get_schema_engine( full_path[0] )
