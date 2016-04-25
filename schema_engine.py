@@ -102,6 +102,32 @@ class SchemaNode:
             s += "\n"+c.__repr__()
         return s
 
+    def json_inject_data(self, value, object_id_name, object_id_val, internal = False):
+        res = None
+        if self.value is self.type_array:
+            if internal:
+                value = [value]
+            # value must be array
+            if self.parent and self.name:
+                res = {self.name: value}
+            else:
+                res = value
+        elif self.value is self.type_struct:
+            # value must be struct
+            if self.name:
+                res = {self.name: value}
+            else:
+                res = value
+            if not self.parent.parent \
+                    and self.parent.value is self.type_array:
+                node_name = self.get_id_node().name
+                res[object_id_name] = object_id_val
+            
+        if self.parent:
+            return self.parent.json_inject_data(res, object_id_name, object_id_val, True)
+        else:
+            return res
+
     def get_nested_array_type_nodes(self):
         l = []
         for i in self.children:
@@ -168,17 +194,19 @@ class SchemaNode:
         else:
             self.value = json_schema
 
-    def add_parents_references(self):
-        for arr in [i for i in self.all_parents() if i.value == i.type_array]:
-            idnode = arr.get_id_node()
-            if self.long_alias() != arr.long_alias() and idnode:
-                child = SchemaNode(self)
-                child.name = '_'.join([item.external_name() \
-                                       for item in idnode.all_parents() \
-                                       if item.name])
-                child.value = idnode.value
-                child.reference = idnode
-                self.children.append(child)
+    def add_parent_references(self):
+        # find root
+        root = [i for i in self.all_parents() \
+                    if i.value == i.type_array and not i.parent][0]
+        idnode = root.get_id_node()
+        if self.long_alias() != root.long_alias() and idnode:
+            child = SchemaNode(self)
+            child.name = '_'.join([item.external_name() \
+                                   for item in idnode.all_parents() \
+                                   if item.name])
+            child.value = idnode.value
+            child.reference = idnode
+            self.children.append(child)
 
     def name_components(self):
         if self.name_components_cached is not None:
@@ -266,9 +294,9 @@ class SchemaEngine:
         self.root_node.load(name, schema)
         for item in self.root_node.get_nested_array_type_nodes():
             if item.children[0].value == item.type_struct:
-                item.children[0].add_parents_references()
+                item.children[0].add_parent_references()
             else:
-                item.add_parents_references()
+                item.add_parent_references()
         self.schema = schema
 
     def locate(self, fields_list):
@@ -416,12 +444,12 @@ class Tables:
         self.errors = {}
 
     def load_all(self):
+        """ Load data into root"""
         root = self.schema_engine.root_node
         if self.data is None:
             self.data_engine.load_tables_structure_only_recursively(root)
         else:
             self.data_engine.load_data_recursively(self.data, root)
-
 
 def create_schema_engine(collection_name, schemapath):
     with open(schemapath, "r") as input_schema_f:

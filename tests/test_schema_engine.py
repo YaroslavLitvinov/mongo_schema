@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 
 import os
+from bson.json_util import loads
 from mongo_schema.schema_engine import create_schema_engine
 from mongo_schema.schema_engine import create_tables_load_file
 from mongo_schema.schema_engine import create_tables_load_bson_data
+from mongo_schema.schema_engine import Tables
 
 files = {'a_inserts': ('test_files/json_schema2.txt',
                        'test_files/bson_data2.txt')}
@@ -124,6 +126,72 @@ def test_all_tables():
     check_comments_table(tables)
     check_items_table(tables)
     check_indices_table(tables)
+
+def test_partial_record1():
+    locate_name = ['comments']
+    bson_raw_id_data = '{"_id": {"$oid": "56b8da51f9fcee1b00000006"}}'
+    array_bson_raw_data = '[{\
+"_id": {"$oid": "56b8f344f9fcee1b00000018"},\
+"updated_at": {"$date": "2016-02-08T19:57:56.678Z"},\
+"created_at": {"$date": "2016-02-08T19:57:56.678Z"}}]'
+    collection_name = 'a_inserts'
+    schema_engine = get_schema_engine( collection_name )
+    node = schema_engine.locate(locate_name)
+    bson_object_id = loads(bson_raw_id_data) 
+    bson_data = loads(array_bson_raw_data) 
+    whole_bson = node.json_inject_data(bson_data, 
+                                       bson_object_id.keys()[0],
+                                       bson_object_id.values()[0])
+    print whole_bson
+    tables = Tables(schema_engine, whole_bson)
+    tables.load_all()
+    print "tables.tables.keys()", tables.tables.keys()
+    table_name = 'a_insert_comments'
+    comments_t = tables.tables[table_name]
+    print "sql_column_names", comments_t.sql_column_names
+    assert(comments_t.sql_columns['updated_at'])
+    id_oid = comments_t.sql_columns['id_oid'].values[0]
+    print "id_oid", id_oid
+    assert(id_oid == "56b8f344f9fcee1b00000018")
+    assert(len(comments_t.sql_columns['id_oid'].values) == 1)
+    parent_id_oid = comments_t.sql_columns['a_inserts_id_oid'].values[0]
+    print "parent_id_oid", parent_id_oid
+    assert(parent_id_oid == "56b8da51f9fcee1b00000006")
+    #both tables: a_inserts, comments should be available
+    assert(len(tables.tables.keys())==2)
+
+
+def test_partial_record2():
+    locate_name = ['comments', 'items', 'indices']
+    bson_raw_id_data = '{"_id": {"$oid": "56b8da51f9fcee1b00000006"}}'
+    array_bson_raw_data = '[21, 777]'
+    collection_name = 'a_inserts'
+    schema_engine = get_schema_engine( collection_name )
+    node = schema_engine.locate(locate_name)
+    bson_object_id = loads(bson_raw_id_data) 
+    bson_data = loads(array_bson_raw_data) 
+    whole_bson = node.json_inject_data(bson_data, 
+                                       bson_object_id.keys()[0],
+                                       bson_object_id.values()[0])
+    print whole_bson
+    tables = Tables(schema_engine, whole_bson)
+    tables.load_all()
+    print "tables.tables.keys()", tables.tables.keys()
+    table_name = 'a_insert_comment_item_indices'
+    indices_t = tables.tables[table_name]
+    print "sql_column_names", indices_t.sql_column_names
+    assert(indices_t.sql_columns['indices'])
+    # verify parent ids
+    parent_id_oid = indices_t.sql_columns['a_inserts_id_oid'].values[0]
+    # Old bag fixed: no more parent ids
+    assert('a_inserts_comments_id_oid' not in indices_t.sql_columns.keys())
+    assert('a_inserts_comments_items_id_oid' not in indices_t.sql_columns.keys())
+    assert('a_inserts_comments_items_indices_id_oid' not in indices_t.sql_columns.keys())
+    print "parent_id_oid", parent_id_oid
+    assert(parent_id_oid == "56b8da51f9fcee1b00000006")
+    #both tables: a_inserts, comments should be available
+    assert(len(tables.tables.keys())==4)
+
 
 if __name__=='__main__':
     test_all()
