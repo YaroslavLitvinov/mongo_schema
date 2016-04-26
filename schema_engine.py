@@ -103,7 +103,8 @@ class SchemaNode:
         return s
 
     def json_inject_data(self, value, object_id_name, object_id_val, internal = False):
-        res = None
+        # print "json_inject_data", self.value, internal, value
+        res = value
         if self.value is self.type_array:
             if internal:
                 value = [value]
