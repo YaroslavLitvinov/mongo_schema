@@ -73,9 +73,13 @@ class SqlTable:
         self.sql_column_names.sort()
         for parent_array in parent_arrays: 
 #add indexes
-            sqlcol = SqlColumn(root, parent_array)
-            self.sql_column_names.append(sqlcol.name)
-            self.sql_columns[sqlcol.name] = sqlcol
+            # Allow to add index only if 
+            # 1. table is not super root
+            # 2. if index is not referring to super root
+            if root.parent and parent_array.parent:
+                sqlcol = SqlColumn(root, parent_array)
+                self.sql_column_names.append(sqlcol.name)
+                self.sql_columns[sqlcol.name] = sqlcol
 
     def __repr__(self): # pragma: no cover
         return self.table_name + ' ' + str(self.sql_columns)

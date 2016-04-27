@@ -85,7 +85,6 @@ def check_a_inserts_table(tables):
     sqltable = tables.tables["a_inserts"]
     check_one_column(sqltable, 'body', ['body3'])
     check_one_column(sqltable, 'id_oid', ['56b8f05cf9fcee1b00000010'])
-    check_one_column(sqltable, 'idx', [1])
 
 def check_comments_table(tables):
     sqltable = tables.tables["a_insert_comments"]
@@ -93,21 +92,21 @@ def check_comments_table(tables):
                                           '56b8f05cf9fcee1b00000011'])
     check_one_column(sqltable, 'body', ['body3', 'body2'])
     check_one_column(sqltable, 'idx', [1, 2])
-    check_one_column(sqltable, 'a_inserts_idx', [1, 1])
+    assert('a_inserts_idx' not in sqltable.sql_columns)
 
 def check_items_table(tables):
     sqltable = tables.tables["a_insert_comment_items"]
     check_one_column(sqltable, 'data', ['1', '2'])
     check_one_column(sqltable, 'idx', [1, 2])
-    check_one_column(sqltable, 'a_inserts_idx', [1, 1])
     check_one_column(sqltable, 'a_inserts_comments_idx', [1, 2])
+    assert('a_inserts_idx' not in sqltable.sql_columns)
 
 def check_indices_table(tables):
     sqltable = tables.tables["a_insert_comment_item_indices"]
     check_one_column(sqltable, 'idx', [1, 2, 3, 4, 5, 6])
-    check_one_column(sqltable, 'a_inserts_idx', [1, 1, 1, 1, 1, 1])
     check_one_column(sqltable, 'a_inserts_comments_idx', [1, 1, 1, 2, 2, 2])
     check_one_column(sqltable, 'indices', [10, 11, 12, 13, 14, 15])
+    assert('a_inserts_idx' not in sqltable.sql_columns)
 
 def test_all_tables():
     collection_name = 'a_inserts'
