@@ -6,6 +6,7 @@ from mongo_schema.schema_engine import create_schema_engine
 from mongo_schema.schema_engine import create_tables_load_file
 from mongo_schema.schema_engine import create_tables_load_bson_data
 from mongo_schema.schema_engine import Tables
+from mongo_schema.schema_engine import SqlColumn
 
 files = {'a_inserts': ('test_files/json_schema2.txt',
                        'test_files/bson_data2.txt')}
@@ -125,6 +126,7 @@ def test_all_tables():
     check_comments_table(tables)
     check_items_table(tables)
     check_indices_table(tables)
+    return tables
 
 def test_partial_record1():
     locate_name = ['comments']
@@ -190,6 +192,61 @@ def test_partial_record2():
     assert(parent_id_oid == "56b8da51f9fcee1b00000006")
     #both tables: a_inserts, comments should be available
     assert(len(tables.tables.keys())==4)
+
+
+def test_comparator1():
+    tables1 = test_all_tables()
+    tables2 = test_all_tables()
+    assert(tables1.compare(tables2))
+
+def test_comparator2():
+    tables1 = test_all_tables()
+    # inject error 
+    tmp_tables = test_all_tables()
+    tmp_node = tmp_tables.tables['a_insert_comments'].root
+    tmp_tables.tables['a_insert_comments'].sql_column_names.append('foo')
+    tmp_tables.tables['a_insert_comments'].sql_columns['foo'] = SqlColumn(tmp_node, tmp_node)
+    assert(not tables1.compare(tmp_tables))
+
+def test_comparator3():
+    tables1 = test_all_tables()
+    # inject error 
+    tmp_tables = test_all_tables()
+    tmp_tables.tables['a_insert_comments'].sql_columns['body'].values[0] = 'error'
+    assert(not tables1.compare(tmp_tables))
+
+def test_comparator4():
+    tables1 = test_all_tables()
+    # inject error 
+    tmp_tables = test_all_tables()
+    tmp_tables.tables['a_insert_comments'].sql_columns['body'].values.append('error2')
+    assert(not tables1.compare(tmp_tables))
+
+
+def test_external_data_loader():
+
+    def table_rows_list(table):
+        """ get list of rows, every row is values list
+        @param table object schema_engine.SqlTable"""
+        res = []
+        firstcolname = table.sql_column_names[0]
+        reccount = len(table.sql_columns[firstcolname].values)
+        for val_i in xrange(reccount):
+            values = []
+            for column_name in table.sql_column_names:
+                col = table.sql_columns[column_name]
+                values.append(col.values[val_i])
+            res.append( values )
+        return res
+
+    tables1 = test_all_tables()
+    ext_tables = create_tables_load_bson_data(tables1.schema_engine, None)
+    ext_tables_data = {}
+    for name in tables1.tables:
+        ext_tables_data[name] = table_rows_list(tables1.tables[name])
+    ext_tables.load_external_tables_data(ext_tables_data)
+    assert(tables1.compare(ext_tables))
+
 
 
 if __name__=='__main__':

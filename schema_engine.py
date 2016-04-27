@@ -460,6 +460,50 @@ class Tables:
         else:
             self.data_engine.load_data_recursively(self.data, root)
 
+    def load_external_tables_data(self, arrays_dict):
+        """ @param arrays_dict {table_name: rows }"""
+        for name, array in arrays_dict.iteritems():
+            sqltable = self.tables[name]
+            for colname_i in xrange(len(sqltable.sql_column_names)):
+                colname = sqltable.sql_column_names[colname_i]
+                sqlcol = sqltable.sql_columns[colname]
+                for row in array:
+                    sqlcol.values.append(row[colname_i])
+                self.tables[name].sql_columns[colname] = sqlcol
+ 
+    def compare(self, tables_obj):
+        """ Get separate bson record. Collect data from all tables and columns. 
+        Operation is opposite to self.load_all()"""
+        res = {}
+        cursors = {}
+        table_names = self.schema_engine.get_tables_list()
+        for table_name in table_names:
+            sqltable = self.tables[table_name]
+            sqltable2 = tables_obj.tables[table_name]
+            if sqltable.sql_column_names != sqltable2.sql_column_names:
+                msg_fmt = "Table %s has different columns %s and %s"
+                message(msg_fmt % (table_name, 
+                                   sqltable.sql_column_names,
+                                   sqltable2.sql_column_names))
+                return False
+            for colname in sqltable.sql_column_names:
+                sqlcol = sqltable.sql_columns[colname]
+                sqlcol2 = sqltable2.sql_columns[colname]
+                if len(sqlcol.values) != len(sqlcol2.values):
+                    msg_fmt = "Column %s.%s has different rows count %d and %d"
+                    message(msg_fmt % (table_name, sqlcol.name,
+                                       len(sqlcol.values), len(sqlcol2.values)))
+                    return False
+                for idx in xrange(len(sqlcol.values)):
+                    val = sqlcol.values[idx]
+                    val2 = sqlcol2.values[idx]
+                    if val != val2:
+                        msg_fmt = "Column %s.%s[%d] has different values %s and %s"
+                        message(msg_fmt % (table_name, sqlcol.name, idx,
+                                           str(val), str(val2)))
+                        return False
+        return True
+
 def create_schema_engine(collection_name, schemapath):
     with open(schemapath, "r") as input_schema_f:
         schema = [json.load(input_schema_f)]
