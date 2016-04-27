@@ -106,7 +106,8 @@ class SchemaNode:
             s += "\n"+c.__repr__()
         return s
 
-    def json_inject_data(self, value, object_id_name, object_id_val, internal = False):
+    def json_inject_data(self, value, object_id_name, object_id_val, 
+                         internal = False):
         # print "json_inject_data", self.value, internal, value
         res = value
         if self.value is self.type_array:
@@ -129,7 +130,10 @@ class SchemaNode:
                 res[object_id_name] = object_id_val
             
         if self.parent:
-            return self.parent.json_inject_data(res, object_id_name, object_id_val, True)
+            return self.parent.json_inject_data(res, 
+                                                object_id_name, 
+                                                object_id_val,
+                                                True)
         else:
             return res
 
