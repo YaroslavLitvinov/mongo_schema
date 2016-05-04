@@ -476,8 +476,9 @@ class Tables:
         Operation is opposite to self.load_all()"""
         res = {}
         cursors = {}
-        table_names = self.schema_engine.get_tables_list()
-        for table_name in table_names:
+        if self.tables.keys() != tables_obj.tables.keys():
+            return False
+        for table_name in self.tables:
             sqltable = self.tables[table_name]
             sqltable2 = tables_obj.tables[table_name]
             if sqltable.sql_column_names != sqltable2.sql_column_names:
