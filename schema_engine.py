@@ -110,6 +110,7 @@ class SchemaNode:
                          internal = False):
         # print "json_inject_data", self.value, internal, value
         res = value
+        # if node itself is array
         if self.value is self.type_array:
             if internal:
                 value = [value]
@@ -118,6 +119,7 @@ class SchemaNode:
                 res = {self.name: value}
             else:
                 res = value
+        # if node itself is struct
         elif self.value is self.type_struct:
             # value must be struct
             if self.name:
@@ -378,7 +380,7 @@ class DataEngine:
         component_idx = 0
 
         for parnode in node.all_parents():
-            if not curdata:
+            if curdata is None:
                 break
             if parnode.value == parnode.type_array:
                 cursor = self.cursors[parnode.long_alias()]
