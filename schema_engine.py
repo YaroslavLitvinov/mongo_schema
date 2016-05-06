@@ -474,12 +474,21 @@ class Tables:
     def compare(self, tables_obj):
         """ Get separate bson record. Collect data from all tables and columns. 
         Operation is opposite to self.load_all()"""
+        def table_vals(sqltable):
+            res = {}
+            for col_name, col in sqltable.sql_column_names:
+                if len(col.values):
+                    res[col_name] = col.values
+            return res
+        
         res = {}
         cursors = {}
-        if self.tables.keys() != tables_obj.tables.keys():
-            return False
         for table_name in self.tables:
             sqltable = self.tables[table_name]
+            if table_name not in tables_obj.tables and \
+                    table_vals(self.tables[table_name]) == {}:
+                # table w/o values and absent tables are both empty
+                continue
             sqltable2 = tables_obj.tables[table_name]
             if sqltable.sql_column_names != sqltable2.sql_column_names:
                 msg_fmt = "Table %s has different columns %s and %s"
