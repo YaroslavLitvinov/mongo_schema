@@ -1,5 +1,16 @@
 #!/usr/bin/env python
 
+""" schema_engine.py: This module is providing classes and functions
+for parsing bson data and transforming it's data to relational
+structure.
+'SchemaEngine' -- is loading json schema into tree of nodes;
+'SchemaNode' -- is a main class for working with nodes of schema;
+'DataEngine' -- data loader, for internal use;
+'Tables' -- class for loading bson data into relational tables ('SqlTable');
+'SqlTable' -- relational table with columns (SqlColumn);
+'SqlColumn' -- table's column holds all column values.
+"""
+
 __author__ = "Yaroslav Litvinov"
 __copyright__ = "Copyright 2016, Rackspace Inc."
 __email__ = "yaroslav.litvinov@rackspace.com"
@@ -10,26 +21,29 @@ import json
 import bson
 from bson import json_util
 
-def message(mes, cr='\n'):
-    sys.stderr.write( mes + cr)
+def message(mes, crn='\n'):
+    """ stderr message """
+    sys.stderr.write(mes + crn)
 
-def python_type_as_str(t):
-    if t is str or t is unicode:
-        return "STRING"
-    elif t is int:
-        return "INT"
-    elif t is float:
-        return "DOUBLE"
-    elif t is datetime.datetime:
-        return "TIMESTAMP"
-    elif t is bool:
-        return "BOOLEAN"
-    elif t is bson.int64.Int64:
-        return "BIGINT"
-    else:
-        return None
+def python_type_as_str(typo):
+    """ python type to schema's type """
+    res = None
+    if typo is str or typo is unicode:
+        res = "STRING"
+    elif typo is int:
+        res = "INT"
+    elif typo is float:
+        res = "DOUBLE"
+    elif typo is datetime.datetime:
+        res = "TIMESTAMP"
+    elif typo is bool:
+        res = "BOOLEAN"
+    elif typo is bson.int64.Int64:
+        res = "BIGINT"
+    return res
 
 class SqlColumn:
+    """ Column with values, related to self.node """
     def __init__(self, root, node):
         self.root = root
         self.node = node
@@ -54,11 +68,20 @@ class SqlColumn:
             index_key = self.node.long_alias()
             return index_key
         else:
-            None
+            return None
 
 class SqlTable:
+    """ SqlTable is plain table which reflects array node's data,
+    table columns are node childs, no columns related to nested arrays.
+
+    self.sql_column_names - sorted column names list for deterministic
+    columns order
+    self.sql_columns dict of SqlColumn objects"""
+
     def __init__(self, root):
-        """ Logical structure of table """
+        """ Logical structure of table
+        params:
+        root - SchemaNode which is array node """
         assert(root.value == root.type_array)
         self.sql_column_names = []
         self.sql_columns = {}
@@ -71,9 +94,9 @@ class SqlTable:
         parent_arrays = [i for i in root.all_parents() \
                          if i.value == i.type_array]
         self.sql_column_names.sort()
-        for parent_array in parent_arrays: 
-#add indexes
-            # Allow to add index only if 
+        for parent_array in parent_arrays:
+            # add indexes
+            # Allow to add index only if
             # 1. table is not super root
             # 2. if index is not referring to super root
             if root.parent and parent_array.parent:
@@ -85,6 +108,7 @@ class SqlTable:
         return self.table_name + ' ' + str(self.sql_columns)
 
 class SchemaNode:
+    """ Base class for creating tree of nodes from json schema """
     type_struct = 11 #'STRUCT'
     type_array = 12 #'ARRAY'
 
@@ -93,7 +117,7 @@ class SchemaNode:
         self.children = []
         self.all_parents_cached = None
         self.long_alias_cached = None
-        self.external_name_cached = None
+        self.public_name_cached = None
         self.name_components_cached = None
         self.name = None
         self.value = None
@@ -101,13 +125,16 @@ class SchemaNode:
 
     def __repr__(self): # pragma: no cover
         gap = ''.join(['----' for s in xrange(len(self.all_parents()))])
-        s = "%s%s : %s" % (gap, self.external_name(), self.value)
-        for c in self.children:
-            s += "\n"+c.__repr__()
-        return s
+        strval = "%s%s : %s" % (gap, self.public_name(), self.value)
+        for child in self.children:
+            strval += "\n"+child.__repr__()
+        return strval
 
-    def json_inject_data(self, value, object_id_name, object_id_val, 
-                         internal = False):
+    def json_inject_data(self, value, object_id_name, object_id_val,
+                         internal=False):
+        """ Return artificially created bson object with value assigned
+        to field corresponding to self node. Object id will be taken from
+        object_id_val."""
         # print "json_inject_data", self.value, internal, value
         res = value
         # if node itself is array
@@ -128,24 +155,23 @@ class SchemaNode:
                 res = value
             if not self.parent.parent \
                     and self.parent.value is self.type_array:
-                node_name = self.get_id_node().name
                 res[object_id_name] = object_id_val
-            
         if self.parent:
-            return self.parent.json_inject_data(res, 
-                                                object_id_name, 
+            return self.parent.json_inject_data(res,
+                                                object_id_name,
                                                 object_id_val,
                                                 True)
         else:
             return res
 
     def get_nested_array_type_nodes(self):
-        l = []
-        for i in self.children:
-            l.extend(i.get_nested_array_type_nodes())
-            if i.value == self.type_array:
-                l = [i] + l
-        return l
+        """ return list of nested arrays """
+        nodes = []
+        for child in self.children:
+            nodes.extend(child.get_nested_array_type_nodes())
+            if child.value == self.type_array:
+                nodes = [child] + nodes
+        return nodes
 
     def all_parents(self):
         """ return list of parents and node itself, cache results """
@@ -159,6 +185,7 @@ class SchemaNode:
         return res
 
     def get_id_node(self):
+        """ Get id node from node's children list """
         node_parent_id = self.locate(['_id']) or self.locate(['id'])
         if node_parent_id:
             node_parent_id_oid = node_parent_id.locate(['oid'])
@@ -166,17 +193,21 @@ class SchemaNode:
                 return node_parent_id_oid
             else:
                 return node_parent_id
+        return None
 
     def list_non_array_nodes(self):
+        """ Get child nodes list except of array nodes """
         fields = []
         for item in self.children:
             if item.value != self.type_array:
                 if item.value != self.type_struct:
                     fields.append(item)
-                fields.extend( item.list_non_array_nodes() )
+                fields.extend(item.list_non_array_nodes())
         return fields
 
     def locate(self, names_list):
+        """ return SchemaNode object
+        names_list -- components list identifying specific node"""
         for item in self.children:
             if not item.name and item.value == self.type_struct:
                 return item.locate(names_list)
@@ -189,30 +220,34 @@ class SchemaNode:
         return None
 
     def load(self, name, json_schema):
+        """ load json schema and assign it to field name
+        name --
+        json_schema --"""
         self.name = name
         if type(json_schema) is dict:
             self.value = self.type_struct
-            for k, v in json_schema.iteritems():
+            for key, val in json_schema.iteritems():
                 child = SchemaNode(self)
-                child.load(k, v)
+                child.load(key, val)
                 self.children.append(child)
         elif type(json_schema) is list:
             self.value = self.type_array
-            for v in json_schema:
+            for val in json_schema:
                 child = SchemaNode(self)
-                child.load(None, v)
+                child.load(None, val)
                 self.children.append(child)
         else:
             self.value = json_schema
 
     def add_parent_references(self):
-        # find root
+        """ For every array node except root node add to self node references
+        to parent nodes """
         root = [i for i in self.all_parents() \
                     if i.value == i.type_array and not i.parent][0]
         idnode = root.get_id_node()
         if self.long_alias() != root.long_alias() and idnode:
             child = SchemaNode(self)
-            child.name = '_'.join([item.external_name() \
+            child.name = '_'.join([item.public_name() \
                                    for item in idnode.all_parents() \
                                    if item.name])
             child.value = idnode.value
@@ -220,6 +255,7 @@ class SchemaNode:
             self.children.append(child)
 
     def name_components(self):
+        """ List of names of parent components """
         if self.name_components_cached is not None:
             return self.name_components_cached
         components = [i.name for i in self.all_parents()[1:] if i.name]
@@ -229,77 +265,88 @@ class SchemaNode:
 
 #methods related to naming conventions
 
-    def external_name(self):
-        if self.external_name_cached is not None:
-            return self.external_name_cached
+    def public_name(self):
+        """ Name of node exposed by public interface """
+        if self.public_name_cached is not None:
+            return self.public_name_cached
         temp = ''
         if self.name:
-            temp = self.name 
-#the same name for "array" and "noname struct in array"
+            temp = self.name
         elif not self.name and self.parent.value == self.type_array:
+            # the same name for "array" and "noname struct in array"
             temp = self.parent.name
         if len(temp) and temp[0] == '_':
-            self.external_name_cached = temp[1:]
+            self.public_name_cached = temp[1:]
         else:
-            self.external_name_cached = temp
-        return self.external_name_cached
+            self.public_name_cached = temp
+        return self.public_name_cached
 
-    def external_nonplural_name(self):
-        externname = self.external_name().lower()
+    def public_nonplural_name(self):
+        """ For array node get non plural name, else get public_name() """
+        externname = self.public_name().lower()
         if self.value == self.type_array and \
            len(externname) and externname[-1] == 's':
             return externname[:-1]
         else:
-            return externname        
+            return externname
 
     def short_alias(self):
+        """ Short name of node"""
         if self.reference:
-#for reference items the name is always long_alias()
-           return self.external_name()
+            # long_alias is always used for referenced item name
+            return self.public_name()
         else:
             parent_name = ''
             if self.parent and self.parent.name and \
                self.parent.value == self.type_struct:
 #parent is named struct
                 parent_name = self.parent.short_alias()
-                return '_'.join([parent_name, self.external_name()])
+                return '_'.join([parent_name, self.public_name()])
             elif self.name:
-                return self.external_name()
+                return self.public_name()
             elif not self.name and self.value != self.type_struct:
 #non struct node with empty name
-                return self.parent.external_name()
+                return self.parent.public_name()
             else:
 #struct without name
                 return ''
 
-    def long_alias(self, delimeter = '_'):
+    def long_alias(self, delimeter='_'):
+        """ Name of node where name components joined and separated by delim.
+        @param delimiter alternative delimiter between components """
         if self.long_alias_cached is not None:
             return self.long_alias_cached
         if self.reference:
+            # long_alias is always used for referenced item name
             self.long_alias_cached = self.name
         else:
-            p = self.all_parents()
-            self.long_alias_cached = delimeter.join([item.external_name() for item in p if item.name])
+            parents = self.all_parents()
+            components = [item.public_name() for item in parents if item.name]
+            self.long_alias_cached = delimeter.join(components)
         return self.long_alias_cached
 
     def long_plural_alias(self, delimiter='_'):
+        """ 'Plural' name of self node constructed from name components.
+        It keeps trailing 's' char and removes 's' chars in components[:-1]
+        @param delimiter alternative delimiter between components"""
         if self.reference:
-#reference items name always is long_alias()
-           return self.name
+            # long_alias is always used for referenced item name
+            return self.name
         else:
-            l = []
-            p = self.all_parents()
-            n = 0
-            for item in p:
-                n += 1
-                if item.value == self.type_array and n != len(p):
-                    l.append(item.external_nonplural_name())
+            components = []
+            parents = self.all_parents()
+            num = 0
+            for item in parents:
+                num += 1
+                if item.value == self.type_array and num != len(parents):
+                    components.append(item.public_nonplural_name())
                 elif item.name:
-                    l.append(item.external_name())
-            return delimiter.join(l)
+                    components.append(item.public_name())
+            return delimiter.join(components)
 
 
 class SchemaEngine:
+    """ holds a tree of nodes, and json schema itself """
     def __init__(self, name, schema):
         self.root_node = SchemaNode(None)
         self.root_node.load(name, schema)
@@ -311,10 +358,16 @@ class SchemaEngine:
         self.schema = schema
 
     def locate(self, fields_list):
-        """ return SchemaNode object"""
+        """ return SchemaNode object
+        fields_list -- components list identifying specific node"""
         return self.root_node.locate(fields_list)
 
     def get_tables_list(self, delimiter='_'):
+        """ Unordered list of "table names" where optiopnal delimiter can be \
+        placed between name components.
+        delimiter -- if default delim is using then result will be a list
+        of table names as returned by Tables.tables.keys(),
+        optional delim can be placed between name components"""
         table_names = [self.root_node.long_plural_alias(delimiter)] + \
                       [i.long_plural_alias(delimiter) for i in \
                        self.root_node.get_nested_array_type_nodes()]
@@ -322,11 +375,14 @@ class SchemaEngine:
 
 
 class DataEngine:
+    """ Must not be used directly.
+    Tables class must be used instead for loading data"""
     def __init__(self, root, bson_data, callback, callback_param):
-        """ 
-        @param root - SchemaNode root node for table
-        @param bson_data Data in bson format
-        @param callback Function fill tables by data"""
+        """
+        root -- root node of table
+        bson_data -- Data in bson format
+        callback -- Function which fills tables by data
+        callback_param -- external param for callback"""
         self.root = root
         self.data = bson_data
         self.callback = callback
@@ -335,25 +391,31 @@ class DataEngine:
         self.indexes = {} #Note: names of indexes is differ from col names
 
     def inc_single_index(self, key_name):
+        """ Increment row index, to be to load value for next row.
+        key_name -- index name to increment"""
         if key_name not in self.indexes:
             self.indexes[key_name] = 0
         self.indexes[key_name] += 1
 
-    def load_tables_structure_only_recursively(self, node):
-        """ Do initial sqltables load."""
+    def load_tables_skeleton_recursively(self, node):
+        """ Do initial sqltables load.
+        node --"""
         if node.value == node.type_struct:
             for child in node.children:
                 if child.value == child.type_struct or \
                    child.value == child.type_array:
-                    self.load_tables_structure_only_recursively(child)
+                    self.load_tables_skeleton_recursively(child)
         elif node.value == node.type_array:
 #if expected and real types are the same
-            self.load_tables_structure_only_recursively(node.children[0])
+            self.load_tables_skeleton_recursively(node.children[0])
             self.callback(self.callback_param, node)
 
     def load_data_recursively(self, data, node):
-        """ Do initial data load. Calculate data indexes, 
-            exec callback for every new array"""
+        """ Do initial data load. Calculate data indexes,
+            exec callback for every new array
+        params:
+        data -- data corresponding to node
+        node -- node corresponding to data"""
         if node.value == node.type_struct:
             for child in node.children:
                 if child.value == child.type_struct or \
@@ -372,7 +434,9 @@ class DataEngine:
                     self.cursors[key_name] += 1
 
     def get_current_record_data(self, node):
-        """ Get current data pointed by cursors"""
+        """ Returns data related to node, pointed by current cursor
+        param:
+        node -- node related to data for load"""
         if node.reference:
             return self.get_current_record_data(node.reference)
         curdata = self.data
@@ -406,6 +470,11 @@ class DataEngine:
         return curdata
 
 def load_table_callback(tables, node):
+    """ Callback for loading bson arrays, which are table equivalents.
+    It's using tables.data_engine 'DataEngine' as data source.
+    params:
+    tables -- 'Tables' object to write results
+    node -- array node corresponding to table, which data is loading."""
     table_name = node.long_plural_alias()
     if table_name not in tables.tables:
         tables.tables[table_name] = SqlTable(node)
@@ -416,7 +485,7 @@ def load_table_callback(tables, node):
     for column_name, column in sqltable.sql_columns.iteritems():
         if column.node.value == column.node.type_array: #index
             idxcolkey = column.node.long_alias()
-            column.values.append( tables.data_engine.indexes[idxcolkey] )
+            column.values.append(tables.data_engine.indexes[idxcolkey])
         else:
             colval = tables.data_engine.get_current_record_data(column.node)
             valtype = python_type_as_str(type(colval))
@@ -424,27 +493,30 @@ def load_table_callback(tables, node):
             if valtype == column.typo \
                     or colval is None \
                     or (valtype == 'INT' and coltype == 'DOUBLE'):
-                column.values.append( colval )
+                column.values.append(colval)
             elif (type(colval) is list and coltype == 'TINYINT') \
                     or (type(colval) is dict and coltype == 'TINYINT'):
-                column.values.append( None )
+                column.values.append(None)
             elif (type(colval) is list and coltype == 'STRING') \
                     or (type(colval) is dict and coltype == 'STRING'):
-                column.values.append( '' )
+                column.values.append('')
             else:
-                column.values.append( None )
+                column.values.append(None)
                 colname = column.node.long_alias(delimeter='.')
                 coltype = column.typo
                 if valtype == 'STRING':
                     colval = ''
                 error = "wrong value %s(%s) for %s(%s)" % \
-                            (str(colval), valtype, colname, coltype )
+                            (str(colval), valtype, colname, coltype)
                 if error in tables.errors.keys():
                     tables.errors[error] += 1
                 else:
                     tables.errors[error] = 1
 
 class Tables:
+    """ Tables object intended to store all tables data related
+    to one mongo record. It's exposing interface for loading data
+    from file and memory, and gives comparator for Tables obj. """
     def __init__(self, schema_engine, bson_data):
         self.tables = {}
         self.data = bson_data
@@ -455,15 +527,18 @@ class Tables:
         self.errors = {}
 
     def load_all(self):
-        """ Load data into root"""
+        """ Load data from self.data into self.tables """
         root = self.schema_engine.root_node
         if self.data is None:
-            self.data_engine.load_tables_structure_only_recursively(root)
+            self.data_engine.load_tables_skeleton_recursively(root)
         else:
             self.data_engine.load_data_recursively(self.data, root)
 
     def load_external_tables_data(self, arrays_dict):
-        """ @param arrays_dict {table_name: rows }"""
+        """ Load external data into self.tables,
+        result is equivalent to load_all() function.
+        param:
+        arrays_dict -- {table_name: [rows] }"""
         for name, array in arrays_dict.iteritems():
             sqltable = self.tables[name]
             for colname_i in xrange(len(sqltable.sql_column_names)):
@@ -472,19 +547,19 @@ class Tables:
                 for row in array:
                     sqlcol.values.append(row[colname_i])
                 self.tables[name].sql_columns[colname] = sqlcol
- 
+
     def compare(self, tables_obj):
-        """ Get separate bson record. Collect data from all tables and columns. 
-        Operation is opposite to self.load_all()"""
+        """ Compare table objects, return True if equal, or False if not.
+        param:
+        tables_obj -- 'Tables' object to compare to self"""
         def table_vals(sqltable):
+            """ dict {colname, [values]} """
             res = {}
             for col_name, col in sqltable.sql_column_names:
                 if len(col.values):
                     res[col_name] = col.values
             return res
-        
-        res = {}
-        cursors = {}
+
         for table_name in self.tables:
             sqltable = self.tables[table_name]
             if table_name not in tables_obj.tables and \
@@ -494,7 +569,7 @@ class Tables:
             sqltable2 = tables_obj.tables[table_name]
             if sqltable.sql_column_names != sqltable2.sql_column_names:
                 msg_fmt = "Table %s has different columns %s and %s"
-                message(msg_fmt % (table_name, 
+                message(msg_fmt % (table_name,
                                    sqltable.sql_column_names,
                                    sqltable2.sql_column_names))
                 return False
@@ -510,29 +585,34 @@ class Tables:
                     val = sqlcol.values[idx]
                     val2 = sqlcol2.values[idx]
                     if val != val2:
-                        msg_fmt = "Column %s.%s[%d] has different values %s and %s"
+                        msg_fmt = "Column %s.%s[%d] value %s != %s"
                         message(msg_fmt % (table_name, sqlcol.name, idx,
                                            str(val), str(val2)))
                         return False
         return True
 
 def create_schema_engine(collection_name, schemapath):
+    """ Returns 'SchemaEngine' object based on collection's schema file
+    params:
+    collection_name --
+    schemapath -- json schema filepath"""
     with open(schemapath, "r") as input_schema_f:
         schema = [json.load(input_schema_f)]
         return SchemaEngine(collection_name, schema)
 
 def create_tables_load_bson_data(schema_engine, bson_data):
+    """ Create 'Tables' object from bson data"""
     tables = Tables(schema_engine, bson_data)
     tables.load_all()
     return tables
 
 def create_tables_load_file(schema_engine, datapath):
+    """ Create 'Tables' object from bson file on filesystem"""
     with open(datapath, "r") as input_f:
         data = input_f.read()
         bson_data = json_util.loads(data)
         return create_tables_load_bson_data(schema_engine, bson_data)
 
 if __name__ == "__main__": # pragma: no cover
-    from test_schema_engine import test_all_tables
-    test_all_tables()
+    pass
 

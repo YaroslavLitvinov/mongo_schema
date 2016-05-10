@@ -48,7 +48,7 @@ def test_all():
     assert(items_node.get_id_node())
     field = get_test_node(full_path+['data'])
 #the same name for "array" and "noname struct in array"
-    assert(field.parent.external_name()==field.parent.parent.external_name())
+    assert(field.parent.public_name()==field.parent.parent.public_name())
     assert("data" == field.name)
     assert(full_path==parents)
 
@@ -250,4 +250,4 @@ def test_external_data_loader():
 
 
 if __name__=='__main__':
-    test_all()
+    test_external_data_loader()
