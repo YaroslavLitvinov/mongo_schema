@@ -241,10 +241,14 @@ def test_external_data_loader():
 
     tables1 = test_all_tables()
     ext_tables = create_tables_load_bson_data(tables1.schema_engine, None)
+    # empty before data loaded
+    assert(ext_tables.is_empty()==True)
     ext_tables_data = {}
     for name in tables1.tables:
         ext_tables_data[name] = table_rows_list(tables1.tables[name])
     ext_tables.load_external_tables_data(ext_tables_data)
+    # non empty after data loaded
+    assert(ext_tables.is_empty()==False)
     assert(tables1.compare(ext_tables))
 
 

@@ -591,6 +591,15 @@ class Tables:
                         return False
         return True
 
+    def is_empty(self):
+        isempty = True
+        for table_name, table in self.tables.iteritems():
+            for colname, column in table.sql_columns.iteritems():
+                if column.values != []:
+                    isempty = False
+                    break
+        return isempty
+
 def create_schema_engine(collection_name, schemapath):
     """ Returns 'SchemaEngine' object based on collection's schema file
     params:
