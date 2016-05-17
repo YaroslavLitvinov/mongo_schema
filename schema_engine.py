@@ -610,7 +610,9 @@ def create_schema_engine(collection_name, schemapath):
         return SchemaEngine(collection_name, schema)
 
 def create_tables_load_bson_data(schema_engine, bson_data):
-    """ Create 'Tables' object from bson data"""
+    """ Create 'Tables' object from bson data
+    params:
+    bson_data -- array of objects"""
     tables = Tables(schema_engine, bson_data)
     tables.load_all()
     return tables
