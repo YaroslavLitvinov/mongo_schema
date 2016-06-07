@@ -42,6 +42,18 @@ def python_type_as_str(typo):
         res = "BIGINT"
     return res
 
+def datetime_no_tz(dtime):
+    return datetime.datetime(dtime.year, dtime.month, dtime.day,
+                             dtime.hour, dtime.minute, dtime.second,
+                             dtime.microsecond)
+
+def datetimes_flexible_tz(dt1, dt2):
+    if dt1.tzinfo and not dt2.tzinfo:
+        dt1 = datetime_no_tz(dt1)
+    if dt2.tzinfo and not dt1.tzinfo:
+        dt2 = datetime_no_tz(dt2)
+    return (dt1, dt2)
+
 class SqlColumn:
     """ Column with values, related to self.node """
     def __init__(self, root, node):
@@ -518,7 +530,7 @@ class Tables:
     to one mongo record. It's exposing interface for loading data
     from file and memory, and gives comparator for Tables obj. """
     def __init__(self, schema_engine, bson_data):
-        self.tables = {}
+        self.tables = {} # {'table_name' : SqlTable}
         self.data = bson_data
         self.schema_engine = schema_engine
         self.data_engine = \
@@ -568,7 +580,7 @@ class Tables:
                 continue
             sqltable2 = tables_obj.tables[table_name]
             if sqltable.sql_column_names != sqltable2.sql_column_names:
-                msg_fmt = "Table %s has different columns %s and %s"
+                msg_fmt = "not equal: Table %s has different columns %s and %s"
                 message(msg_fmt % (table_name,
                                    sqltable.sql_column_names,
                                    sqltable2.sql_column_names))
@@ -577,15 +589,21 @@ class Tables:
                 sqlcol = sqltable.sql_columns[colname]
                 sqlcol2 = sqltable2.sql_columns[colname]
                 if len(sqlcol.values) != len(sqlcol2.values):
-                    msg_fmt = "Column %s.%s has different rows count %d and %d"
+                    msg_fmt = "not equal: Column %s.%s has different rows count %d and %d"
+                    #msg_fmt += "values1 = " + str(sqlcol.values) 
+                    #msg_fmt += "values2 = " + str(sqlcol2.values) 
                     message(msg_fmt % (table_name, sqlcol.name,
                                        len(sqlcol.values), len(sqlcol2.values)))
                     return False
                 for idx in xrange(len(sqlcol.values)):
                     val = sqlcol.values[idx]
                     val2 = sqlcol2.values[idx]
+                    if type(val) is datetime.datetime \
+                            and type(val2) is datetime.datetime:
+                        print val, val2
+                        val, val2 = datetimes_flexible_tz(val, val2)
                     if val != val2:
-                        msg_fmt = "Column %s.%s[%d] value %s != %s"
+                        msg_fmt = "not equal: column values at %s.%s[%d] : %s != %s"
                         message(msg_fmt % (table_name, sqlcol.name, idx,
                                            str(val), str(val2)))
                         return False
