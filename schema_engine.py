@@ -20,10 +20,7 @@ import datetime
 import json
 import bson
 from bson import json_util
-
-def message(mes, crn='\n'):
-    """ stderr message """
-    sys.stderr.write(mes + crn)
+from logging import getLogger
 
 def python_type_as_str(typo):
     """ python type to schema's type """
@@ -147,7 +144,9 @@ class SchemaNode:
         """ Return artificially created bson object with value assigned
         to field corresponding to self node. Object id will be taken from
         object_id_val."""
-        # print "json_inject_data", self.value, internal, value
+        getLogger(__name__).\
+            debug('%s self.value=%s, internal=%s, value=%s' % \
+                      ("json_inject_data", self.value, internal, value))
         res = value
         # if node itself is array
         if self.value is self.type_array:
@@ -581,31 +580,38 @@ class Tables:
             sqltable2 = tables_obj.tables[table_name]
             if sqltable.sql_column_names != sqltable2.sql_column_names:
                 msg_fmt = "not equal: Table %s has different columns %s and %s"
-                message(msg_fmt % (table_name,
-                                   sqltable.sql_column_names,
-                                   sqltable2.sql_column_names))
+                getLogger(__name__).info(msg_fmt % (table_name,
+                                                    sqltable.sql_column_names,
+                                                    sqltable2.sql_column_names))
                 return False
             for colname in sqltable.sql_column_names:
                 sqlcol = sqltable.sql_columns[colname]
                 sqlcol2 = sqltable2.sql_columns[colname]
                 if len(sqlcol.values) != len(sqlcol2.values):
-                    msg_fmt = "not equal: Column %s.%s has different rows count %d and %d"
-                    #msg_fmt += "values1 = " + str(sqlcol.values) 
-                    #msg_fmt += "values2 = " + str(sqlcol2.values) 
-                    message(msg_fmt % (table_name, sqlcol.name,
-                                       len(sqlcol.values), len(sqlcol2.values)))
+                    msg_fmt = "not equal: Column %s.%s has different \
+rows count %d and %d"
+                    getLogger(__name__).info(msg_fmt % (table_name, sqlcol.name,
+                                                        len(sqlcol.values), 
+                                                        len(sqlcol2.values)))
+                    getLogger(__name__).debug('Different columns are: ' +
+                                              "colvals1 = " + str(sqlcol.values) +
+                                              "colvals2 = " + str(sqlcol2.values))
                     return False
                 for idx in xrange(len(sqlcol.values)):
                     val = sqlcol.values[idx]
                     val2 = sqlcol2.values[idx]
                     if type(val) is datetime.datetime \
                             and type(val2) is datetime.datetime:
-                        print val, val2
+                        getLogger(__name__).\
+                            debug('original dates before fix: %s, %s' % \
+                                      (str(val), str(val2)))
                         val, val2 = datetimes_flexible_tz(val, val2)
                     if val != val2:
-                        msg_fmt = "not equal: column values at %s.%s[%d] : %s != %s"
-                        message(msg_fmt % (table_name, sqlcol.name, idx,
-                                           str(val), str(val2)))
+                        msg_fmt = "not equal: column vals at %s.%s[%d] : %s != %s"
+                        getLogger(__name__).info(msg_fmt % (table_name, 
+                                                            sqlcol.name, idx,
+                                                            str(val), 
+                                                            str(val2)))
                         return False
         return True
 
