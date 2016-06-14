@@ -465,6 +465,9 @@ class DataEngine:
                     pass
                 else:
                     fieldname = components[component_idx]
+                    if type(curdata) is not dict:
+                        getLogger(__name__).error("error: curdata = %s" % 
+                                                  str(curdata))
                     if fieldname in curdata.keys():
                         curdata = curdata[fieldname]
                         component_idx += 1
