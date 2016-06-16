@@ -658,8 +658,7 @@ def log_table_errors(txtinfo, table_errors):
     if len(table_errors):
         getLogger(__name__).warning(txtinfo)
         ppinter = pprint.PrettyPrinter(indent=4)
-        for line in ppinter.pformat(table_errors):
-            getLogger(__name__).warning(line)
+        getLogger(__name__).warning(ppinter.pformat(table_errors))
 
 
 if __name__ == "__main__": # pragma: no cover
