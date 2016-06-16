@@ -19,6 +19,7 @@ import sys
 import datetime
 import json
 import bson
+import pprint
 from bson import json_util
 from logging import getLogger
 
@@ -648,6 +649,18 @@ def create_tables_load_file(schema_engine, datapath):
         data = input_f.read()
         bson_data = json_util.loads(data)
         return create_tables_load_bson_data(schema_engine, bson_data)
+
+def log_table_errors(txtinfo, table_errors):
+    """ Print to log Tables.errors
+    params:
+    txtinfo -- info to output
+    table_errors -- Tables.errors dict"""
+    if len(table_errors):
+        getLogger(__name__).warning(txtinfo)
+        ppinter = pprint.PrettyPrinter(indent=4)
+        for line in ppinter.pformat(table_errors):
+            getLogger(__name__).warning(line)
+
 
 if __name__ == "__main__": # pragma: no cover
     pass
