@@ -146,8 +146,9 @@ class SchemaNode:
         to field corresponding to self node. Object id will be taken from
         object_id_val."""
         getLogger(__name__).\
-            debug('%s self.value=%s, internal=%s, value=%s' % \
-                      ("json_inject_data", self.value, internal, value))
+            debug('%s node_type=%s, long_alias=%s, internal=%s, value=%s' % \
+                      ("json_inject_data", self.value, self.long_alias(), 
+                       internal, value))
         res = value
         # if node itself is array
         if self.value is self.type_array:
@@ -470,10 +471,17 @@ class DataEngine:
                 if type(curdata) is bson.objectid.ObjectId:
                     pass
                 else:
+                    collection_name = parnode.all_parents()[0].name
                     fieldname = components[component_idx]
                     if type(curdata) is not dict:
-                        getLogger(__name__).error("error: curdata = %s" % 
-                                                  str(curdata))
+                        getLogger(__name__).error("collection=%s field=%s bad type=%s data=%s" % 
+                                                  (collection_name,
+                                                   fieldname,
+                                                   str(type(curdata)),
+                                                   str(curdata)))
+                        getLogger(__name__).error("components=%s, idx=%d" % 
+                                                  (str(components), 
+                                                   component_idx))
                     if fieldname in curdata.keys():
                         curdata = curdata[fieldname]
                         component_idx += 1
