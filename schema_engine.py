@@ -168,13 +168,18 @@ class SchemaNode:
             if not self.parent.parent \
                     and self.parent.value is self.type_array:
                 res[object_id_name] = object_id_val
+        # if node itself a base type field
+        elif self.parent and self.parent.value is self.type_struct:
+            res = {self.name: value}
+
         if self.parent:
-            return self.parent.json_inject_data(res,
-                                                object_id_name,
-                                                object_id_val,
-                                                True)
+            res = self.parent.json_inject_data(res,
+                                               object_id_name,
+                                               object_id_val,
+                                               True)
         else:
-            return res
+            res = value
+        return res
 
     def get_nested_array_type_nodes(self):
         """ return list of nested arrays """
