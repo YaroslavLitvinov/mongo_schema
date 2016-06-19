@@ -19,11 +19,9 @@ import sys
 import datetime
 import json
 import bson
+import pprint
 from bson import json_util
-
-def message(mes, crn='\n'):
-    """ stderr message """
-    sys.stderr.write(mes + crn)
+from logging import getLogger
 
 def python_type_as_str(typo):
     """ python type to schema's type """
@@ -41,6 +39,18 @@ def python_type_as_str(typo):
     elif typo is bson.int64.Int64:
         res = "BIGINT"
     return res
+
+def datetime_no_tz(dtime):
+    return datetime.datetime(dtime.year, dtime.month, dtime.day,
+                             dtime.hour, dtime.minute, dtime.second,
+                             dtime.microsecond)
+
+def datetimes_flexible_tz(dt1, dt2):
+    if dt1.tzinfo and not dt2.tzinfo:
+        dt1 = datetime_no_tz(dt1)
+    if dt2.tzinfo and not dt1.tzinfo:
+        dt2 = datetime_no_tz(dt2)
+    return (dt1, dt2)
 
 class SqlColumn:
     """ Column with values, related to self.node """
@@ -135,7 +145,10 @@ class SchemaNode:
         """ Return artificially created bson object with value assigned
         to field corresponding to self node. Object id will be taken from
         object_id_val."""
-        # print "json_inject_data", self.value, internal, value
+        getLogger(__name__).\
+            debug('%s node_type=%s, long_alias=%s, internal=%s, value=%s' % \
+                      ("json_inject_data", self.value, self.long_alias(), 
+                       internal, value))
         res = value
         # if node itself is array
         if self.value is self.type_array:
@@ -156,13 +169,18 @@ class SchemaNode:
             if not self.parent.parent \
                     and self.parent.value is self.type_array:
                 res[object_id_name] = object_id_val
+        # if node itself a base type field
+        elif self.parent and self.parent.value is self.type_struct:
+            res = {self.name: value}
+
         if self.parent:
-            return self.parent.json_inject_data(res,
-                                                object_id_name,
-                                                object_id_val,
-                                                True)
+            res = self.parent.json_inject_data(res,
+                                               object_id_name,
+                                               object_id_val,
+                                               True)
         else:
-            return res
+            res = value
+        return res
 
     def get_nested_array_type_nodes(self):
         """ return list of nested arrays """
@@ -453,7 +471,17 @@ class DataEngine:
                 if type(curdata) is bson.objectid.ObjectId:
                     pass
                 else:
+                    collection_name = parnode.all_parents()[0].name
                     fieldname = components[component_idx]
+                    if type(curdata) is not dict:
+                        getLogger(__name__).error("collection=%s field=%s bad type=%s data=%s" % 
+                                                  (collection_name,
+                                                   fieldname,
+                                                   str(type(curdata)),
+                                                   str(curdata)))
+                        getLogger(__name__).error("components=%s, idx=%d" % 
+                                                  (str(components), 
+                                                   component_idx))
                     if fieldname in curdata.keys():
                         curdata = curdata[fieldname]
                         component_idx += 1
@@ -518,7 +546,7 @@ class Tables:
     to one mongo record. It's exposing interface for loading data
     from file and memory, and gives comparator for Tables obj. """
     def __init__(self, schema_engine, bson_data):
-        self.tables = {}
+        self.tables = {} # {'table_name' : SqlTable}
         self.data = bson_data
         self.schema_engine = schema_engine
         self.data_engine = \
@@ -568,26 +596,39 @@ class Tables:
                 continue
             sqltable2 = tables_obj.tables[table_name]
             if sqltable.sql_column_names != sqltable2.sql_column_names:
-                msg_fmt = "Table %s has different columns %s and %s"
-                message(msg_fmt % (table_name,
-                                   sqltable.sql_column_names,
-                                   sqltable2.sql_column_names))
+                msg_fmt = "not equal: Table %s has different columns %s and %s"
+                getLogger(__name__).info(msg_fmt % (table_name,
+                                                    sqltable.sql_column_names,
+                                                    sqltable2.sql_column_names))
                 return False
             for colname in sqltable.sql_column_names:
                 sqlcol = sqltable.sql_columns[colname]
                 sqlcol2 = sqltable2.sql_columns[colname]
                 if len(sqlcol.values) != len(sqlcol2.values):
-                    msg_fmt = "Column %s.%s has different rows count %d and %d"
-                    message(msg_fmt % (table_name, sqlcol.name,
-                                       len(sqlcol.values), len(sqlcol2.values)))
+                    msg_fmt = "not equal: Column %s.%s has different \
+rows count %d and %d"
+                    getLogger(__name__).info(msg_fmt % (table_name, sqlcol.name,
+                                                        len(sqlcol.values), 
+                                                        len(sqlcol2.values)))
+                    getLogger(__name__).debug('Different columns are: ' +
+                                              "colvals1 = " + str(sqlcol.values) +
+                                              "colvals2 = " + str(sqlcol2.values))
                     return False
                 for idx in xrange(len(sqlcol.values)):
                     val = sqlcol.values[idx]
                     val2 = sqlcol2.values[idx]
+                    if type(val) is datetime.datetime \
+                            and type(val2) is datetime.datetime:
+                        getLogger(__name__).\
+                            debug('original dates before fix: %s, %s' % \
+                                      (str(val), str(val2)))
+                        val, val2 = datetimes_flexible_tz(val, val2)
                     if val != val2:
-                        msg_fmt = "Column %s.%s[%d] value %s != %s"
-                        message(msg_fmt % (table_name, sqlcol.name, idx,
-                                           str(val), str(val2)))
+                        msg_fmt = "not equal: column vals at %s.%s[%d] : %s != %s"
+                        getLogger(__name__).info(msg_fmt % (table_name, 
+                                                            sqlcol.name, idx,
+                                                            str(val), 
+                                                            str(val2)))
                         return False
         return True
 
@@ -623,6 +664,17 @@ def create_tables_load_file(schema_engine, datapath):
         data = input_f.read()
         bson_data = json_util.loads(data)
         return create_tables_load_bson_data(schema_engine, bson_data)
+
+def log_table_errors(txtinfo, table_errors):
+    """ Print to log Tables.errors
+    params:
+    txtinfo -- info to output
+    table_errors -- Tables.errors dict"""
+    if len(table_errors):
+        getLogger(__name__).warning(txtinfo)
+        ppinter = pprint.PrettyPrinter(indent=4)
+        getLogger(__name__).warning(ppinter.pformat(table_errors))
+
 
 if __name__ == "__main__": # pragma: no cover
     pass
