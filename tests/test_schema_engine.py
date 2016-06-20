@@ -98,13 +98,13 @@ def check_comments_table(tables):
 def check_items_table(tables):
     sqltable = tables.tables["a_insert_comment_items"]
     check_one_column(sqltable, 'data', ['1', '2'])
-    check_one_column(sqltable, 'idx', [1, 2])
+    check_one_column(sqltable, 'idx', [1, 1])
     check_one_column(sqltable, 'a_inserts_comments_idx', [1, 2])
     assert('a_inserts_idx' not in sqltable.sql_columns)
 
 def check_indices_table(tables):
     sqltable = tables.tables["a_insert_comment_item_indices"]
-    check_one_column(sqltable, 'idx', [1, 2, 3, 4, 5, 6])
+    check_one_column(sqltable, 'idx', [1, 2, 3, 1, 2, 3])
     check_one_column(sqltable, 'a_inserts_comments_idx', [1, 1, 1, 2, 2, 2])
     check_one_column(sqltable, 'indices', [10, 11, 12, 13, 14, 15])
     assert('a_inserts_idx' not in sqltable.sql_columns)

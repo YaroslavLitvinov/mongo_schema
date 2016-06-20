@@ -40,12 +40,12 @@ def python_type_as_str(typo):
         res = "BIGINT"
     return res
 
-def datetime_no_tz(dtime):
-    return datetime.datetime(dtime.year, dtime.month, dtime.day,
-                             dtime.hour, dtime.minute, dtime.second,
-                             dtime.microsecond)
 
 def datetimes_flexible_tz(dt1, dt2):
+    def datetime_no_tz(dtime):
+        return datetime.datetime(dtime.year, dtime.month, dtime.day,
+                                 dtime.hour, dtime.minute, dtime.second,
+                                 dtime.microsecond)
     if dt1.tzinfo and not dt2.tzinfo:
         dt1 = datetime_no_tz(dt1)
     if dt2.tzinfo and not dt1.tzinfo:
@@ -115,7 +115,38 @@ class SqlTable:
                 self.sql_columns[sqlcol.name] = sqlcol
 
     def __repr__(self): # pragma: no cover
-        return self.table_name + ' ' + str(self.sql_columns)
+        ppinter = pprint.PrettyPrinter(indent=4)
+        whole_table = {}
+        for colname in self.sql_column_names:
+            whole_table[colname] = self.sql_columns[colname].values
+        return ppinter.pformat(whole_table)
+
+    def compare_with_sample(self, sample):
+        """ sample is a dict with dict of tables """
+        res = True
+        if self.table_name not in sample:
+            res = False
+            getLogger(__name__).error("not equal: Couldn't locate table %s" % \
+                                      self.table_name)
+        else:
+            sample_columns = sample[self.table_name]
+            for column_name, data in sample_columns.iteritems():
+                try:
+                    sqlcolumn = self.sql_columns[column_name]
+                except:
+                    getLogger(__name__).error(sys.exc_info())
+                    getLogger(__name__).error("Available columns are: %s" % \
+                                              self.sql_columns.keys())
+                    res = False
+                if Tables.cmp_values(sqlcolumn.values, data):
+                    getLogger(__name__).info("cmp %s ok" % column_name)
+                else:
+                    res = False
+                    getLogger(__name__).error(
+                        "not equal: %s.%s column values=%s, sample=%s" % \
+                        (self.table_name, column_name, sqlcolumn.values, data) )
+        return res
+
 
 class SchemaNode:
     """ Base class for creating tree of nodes from json schema """
@@ -415,6 +446,11 @@ class DataEngine:
             self.indexes[key_name] = 0
         self.indexes[key_name] += 1
 
+    def reset_single_index(self, key_name):
+        """ Prepare index to load new array.
+        key_name -- index name to increment"""
+        self.indexes[key_name] = 0
+
     def load_tables_skeleton_recursively(self, node):
         """ Do initial sqltables load.
         node --"""
@@ -444,6 +480,7 @@ class DataEngine:
 #if expected and real types are the same
             key_name = node.long_alias()
             self.cursors[key_name] = 0
+            self.reset_single_index(key_name)
             for data_i in data:
                 self.inc_single_index(key_name)
                 self.load_data_recursively(data_i, node.children[0])
@@ -576,6 +613,24 @@ class Tables:
                     sqlcol.values.append(row[colname_i])
                 self.tables[name].sql_columns[colname] = sqlcol
 
+    @staticmethod
+    def cmp_values(vallist1, vallist2):
+        res = True
+        if len(vallist1) != len(vallist2):
+            res = False
+        else:
+            for idx in xrange(len(vallist1)):
+                val = vallist1[idx]
+                val2 = vallist2[idx]
+                if type(val) is datetime.datetime and \
+                   type(val2) is datetime.datetime:
+                    date1, date2 = datetimes_flexible_tz(val, val2)
+                    if date1 != date2:
+                        res = False
+                elif val != val2:
+                    res = False
+        return res
+
     def compare(self, tables_obj):
         """ Compare table objects, return True if equal, or False if not.
         param:
@@ -614,23 +669,25 @@ rows count %d and %d"
                                               "colvals1 = " + str(sqlcol.values) +
                                               "colvals2 = " + str(sqlcol2.values))
                     return False
-                for idx in xrange(len(sqlcol.values)):
-                    val = sqlcol.values[idx]
-                    val2 = sqlcol2.values[idx]
-                    if type(val) is datetime.datetime \
-                            and type(val2) is datetime.datetime:
-                        getLogger(__name__).\
-                            debug('original dates before fix: %s, %s' % \
-                                      (str(val), str(val2)))
-                        val, val2 = datetimes_flexible_tz(val, val2)
-                    if val != val2:
-                        msg_fmt = "not equal: column vals at %s.%s[%d] : %s != %s"
-                        getLogger(__name__).info(msg_fmt % (table_name, 
-                                                            sqlcol.name, idx,
-                                                            str(val), 
-                                                            str(val2)))
-                        return False
+
+                if not Tables.cmp_values(sqlcol.values, sqlcol2.values):
+                    msg_fmt = "not equal: %s.%s column values"
+                    getLogger(__name__).info(msg_fmt % (table_name, 
+                                                        sqlcol.name))
+                    return False
         return True
+
+    def compare_with_sample(self, sample):
+        res = True
+        if sorted(self.tables.keys()) != sorted(sample.keys()):
+            res = False
+            getLogger(__name__).error(
+                "different tables tables=%s, data_tables=%s" % \
+                (sorted(self.tables.keys()), sorted(sample.keys()) ))
+        for table_name, columns in sample.iteritems():
+            if not self.tables[table_name].compare_with_sample(sample):
+                res = False
+        return res
 
     def is_empty(self):
         isempty = True
