@@ -144,9 +144,11 @@ class SqlTable:
                     getLogger(__name__).info("cmp %s ok" % column_name)
                 else:
                     res = False
+                    str_values = [str(i) for i in sqlcolumn.values ]
+                    str_values2 = [str(i) for i in data ]
                     getLogger(__name__).error(
                         "not equal: %s.%s column values=%s, sample=%s" % \
-                        (self.table_name, column_name, sqlcolumn.values, data) )
+                        (self.table_name, column_name, str_values, str_values2) )
         return res
 
 
@@ -178,10 +180,10 @@ class SchemaNode:
         """ Return artificially created bson object with value assigned
         to field corresponding to self node. Object id will be taken from
         object_id_val."""
-        getLogger(__name__).\
-            debug('%s node_type=%s, long_alias=%s, internal=%s, value=%s' % \
-                      ("json_inject_data", self.value, self.long_alias(), 
-                       internal, value))
+        #getLogger(__name__).\
+        #    debug('%s node_type=%s, long_alias=%s, internal=%s, value=%s' % \
+        #              ("json_inject_data", self.value, self.long_alias(), 
+        #               internal, value))
         res = value
         # if node itself is array
         if self.value is self.type_array:
@@ -512,7 +514,7 @@ class DataEngine:
                 else:
                     collection_name = parnode.all_parents()[0].name
                     fieldname = components[component_idx]
-                    if type(curdata) is not dict:
+                    if type(curdata) is not dict and type(curdata) is not list:
                         getLogger(__name__).error("collection=%s field=%s bad type=%s data=%s" % 
                                                   (collection_name,
                                                    fieldname,
@@ -673,9 +675,13 @@ rows count %d and %d"
                     return False
 
                 if not Tables.cmp_values(sqlcol.values, sqlcol2.values):
-                    msg_fmt = "not equal: %s.%s column values"
+                    msg_fmt = "not equal: %s.%s column values val=%s, val2=%s"
+                    str_values = [str(i) for i in sqlcol.values ]
+                    str_values2 = [str(i) for i in sqlcol2.values ]
                     getLogger(__name__).info(msg_fmt % (table_name, 
-                                                        sqlcol.name))
+                                                        sqlcol.name,
+                                                        str_values,
+                                                        str_values2))
                     return False
         return True
 
