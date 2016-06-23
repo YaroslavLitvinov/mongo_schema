@@ -48,8 +48,10 @@ def datetimes_flexible_tz(dt1, dt2):
                                  dtime.microsecond)
     if dt1.tzinfo and not dt2.tzinfo:
         dt1 = datetime_no_tz(dt1)
-    if dt2.tzinfo and not dt1.tzinfo:
+    elif dt2.tzinfo and not dt1.tzinfo:
         dt2 = datetime_no_tz(dt2)
+    else:
+        dt2 = dt2.astimezone(dt1.tzinfo)
     return (dt1, dt2)
 
 class SqlColumn:
