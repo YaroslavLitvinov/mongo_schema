@@ -478,7 +478,14 @@ class DataEngine:
             for child in node.children:
                 if child.value == child.type_struct or \
                    child.value == child.type_array:
-                    if child.name in data:
+                    if type(data) is not dict and type(data) is not list:
+                        getLogger(__name__).warning(\
+                            'Wrong type %s for %s. Data is: %s' % \
+                                (str(type(data)),
+                                 node.long_alias(),
+                                 str(data)
+                                 ))
+                    elif child.name in data:
                         self.load_data_recursively(data[child.name], child)
         elif node.value == node.type_array and type(data) is list:
 #if expected and real types are the same
