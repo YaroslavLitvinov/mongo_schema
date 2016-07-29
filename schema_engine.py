@@ -617,6 +617,13 @@ class Tables:
                     sqlcol.values.append(row[colname_i])
                 self.tables[name].sql_columns[colname] = sqlcol
 
+    def rec_id(self):
+        collection_name = self.schema_engine.root_node.name
+        id_node = self.schema_engine.root_node.get_id_node()
+        sqlcol = self.tables[collection_name]\
+            .sql_columns[id_node.short_alias()]
+        return sqlcol.values[0]
+
     @staticmethod
     def cmp_values(vallist1, vallist2):
         res = True
@@ -718,7 +725,7 @@ def create_schema_engine(collection_name, schemapath):
 def create_tables_load_bson_data(schema_engine, bson_data):
     """ Create 'Tables' object from bson data
     params:
-    bson_data -- array of objects"""
+    bson_data -- one object in list"""
     tables = Tables(schema_engine, bson_data)
     tables.load_all()
     return tables
@@ -728,6 +735,8 @@ def create_tables_load_file(schema_engine, datapath):
     with open(datapath, "r") as input_f:
         data = input_f.read()
         bson_data = json_util.loads(data)
+        getLogger(__name__).info("Loaded %d recs from %s"
+                                 % (len(bson_data), datapath))
         return create_tables_load_bson_data(schema_engine, bson_data)
 
 def log_table_errors(txtinfo, table_errors):
