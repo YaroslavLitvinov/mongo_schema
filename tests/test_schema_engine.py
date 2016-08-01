@@ -42,10 +42,28 @@ def test_all():
     parents = [i.name \
                for i in root.locate(full_path[1:]).all_parents() \
                if i.name is not None]
+    super_parent_id_name = '_'.join([full_path[0], 'id_oid'])
+    # root (a_inserts) parent ids test
+    root_parent_id = root.super_parent().get_id_node()
+    assert(root_parent_id)
+    assert(root_parent_id.short_alias() == 'id_oid')
+    # comments parent ids tests
+    comments_node = get_test_node(full_path[:-1])
+    comments_id_node = comments_node.get_id_node()
+    assert(comments_id_node and comments_id_node.short_alias() == 'id_oid')
+    comments_parent_id = comments_node.super_parent().get_id_node()
+    assert(comments_parent_id)
+    assert(comments_parent_id.long_alias() == super_parent_id_name)
+    # items parent ids tests
     items_node = get_test_node(full_path)
+    items_id_node = items_node.get_id_node()
+    assert(items_id_node and items_id_node.public_name() == 'id')
+    items_parent_id = items_node.super_parent().get_id_node()
+    assert(items_parent_id)
+    assert(items_parent_id.long_alias() == super_parent_id_name)
+    # items rest tests
     assert(items_node.value == items_node.type_array)
     assert(items_node.children[0].short_alias()=='')
-    assert(items_node.get_id_node())
     field = get_test_node(full_path+['data'])
 #the same name for "array" and "noname struct in array"
     assert(field.parent.public_name()==field.parent.parent.public_name())
@@ -86,6 +104,8 @@ def check_a_inserts_table(tables):
     sqltable = tables.tables["a_inserts"]
     check_one_column(sqltable, 'body', ['body3'])
     check_one_column(sqltable, 'id_oid', ['56b8f05cf9fcee1b00000010'])
+    # check indexes
+    assert(not sqltable.idx_nodes())
 
 def check_comments_table(tables):
     sqltable = tables.tables["a_insert_comments"]
@@ -94,6 +114,9 @@ def check_comments_table(tables):
     check_one_column(sqltable, 'body', ['body3', 'body2'])
     check_one_column(sqltable, 'idx', [1, 2])
     assert('a_inserts_idx' not in sqltable.sql_columns)
+    # check indexes
+    long_names = sorted([i.long_alias() for i in sqltable.idx_nodes()])
+    assert(long_names == ['a_inserts_comments'])
 
 def check_items_table(tables):
     sqltable = tables.tables["a_insert_comment_items"]
@@ -101,6 +124,10 @@ def check_items_table(tables):
     check_one_column(sqltable, 'idx', [1, 1])
     check_one_column(sqltable, 'a_inserts_comments_idx', [1, 2])
     assert('a_inserts_idx' not in sqltable.sql_columns)
+    # check indexes
+    long_names = sorted([i.long_alias() for i in sqltable.idx_nodes()])
+    assert(long_names == sorted(['a_inserts_comments', 
+                                 'a_inserts_comments_items']))
 
 def check_indices_table(tables):
     sqltable = tables.tables["a_insert_comment_item_indices"]
@@ -108,6 +135,11 @@ def check_indices_table(tables):
     check_one_column(sqltable, 'a_inserts_comments_idx', [1, 1, 1, 2, 2, 2])
     check_one_column(sqltable, 'indices', [10, 11, 12, 13, 14, 15])
     assert('a_inserts_idx' not in sqltable.sql_columns)
+    # check indexes
+    long_names = sorted([i.long_alias() for i in sqltable.idx_nodes()])
+    assert(long_names == sorted(['a_inserts_comments', 
+                                 'a_inserts_comments_items',
+                                 'a_inserts_comments_items_indices']))
 
 def test_all_tables():
     collection_name = 'a_inserts'
