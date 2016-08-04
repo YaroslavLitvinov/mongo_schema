@@ -699,9 +699,15 @@ rows count %d and %d"
 
                 if not Tables.cmp_values(sqlcol.values, sqlcol2.values):
                     msg_fmt = "not equal: %s.%s column values val=%s, val2=%s"
-                    str_values = [str(i) for i in sqlcol.values ]
-                    str_values2 = [str(i) for i in sqlcol2.values ]
-                    getLogger(__name__).info(msg_fmt % (table_name, 
+                    try:
+                        str_values = [str(i) for i in sqlcol.values ]
+                        str_values2 = [str(i) for i in sqlcol2.values ]
+                    except:
+                        if not str_values:
+                            str_values = ['!!!!Exeption!!!!']
+                        if not str_values2:
+                            str_values2 = ['!!!!Exeption!!!!']
+                    getLogger(__name__).info(msg_fmt % (table_name,
                                                         sqlcol.name,
                                                         str_values,
                                                         str_values2))
