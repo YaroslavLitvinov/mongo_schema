@@ -103,18 +103,11 @@ class SqlTable:
             sqlcol = SqlColumn(root, node)
             self.sql_column_names.append(sqlcol.name)
             self.sql_columns[sqlcol.name] = sqlcol
-        parent_arrays = [i for i in root.all_parents() \
-                         if i.value == i.type_array]
         self.sql_column_names.sort()
-        for parent_array in parent_arrays:
-            # add indexes
-            # Allow to add index only if
-            # 1. table is not super root
-            # 2. if index is not referring to super root
-            if root.parent and parent_array.parent:
-                sqlcol = SqlColumn(root, parent_array)
-                self.sql_column_names.append(sqlcol.name)
-                self.sql_columns[sqlcol.name] = sqlcol
+        for idx_node in self.idx_nodes():
+            sqlcol = SqlColumn(root, idx_node)
+            self.sql_column_names.append(sqlcol.name)
+            self.sql_columns[sqlcol.name] = sqlcol
 
     def __repr__(self): # pragma: no cover
         ppinter = pprint.PrettyPrinter(indent=4)
@@ -122,6 +115,18 @@ class SqlTable:
         for colname in self.sql_column_names:
             whole_table[colname] = self.sql_columns[colname].values
         return ppinter.pformat(whole_table)
+
+    def idx_nodes(self):
+        idx_nodes = []
+        parent_arrays = [i for i in self.root.all_parents() \
+                             if i.value == i.type_array]
+        for node in parent_arrays:
+            # add node to list of index nodes only if:
+            # 1. self table is not super root
+            # 2. node from parents list is not a super root
+            if self.root.parent and node.parent:
+                idx_nodes.append(node)
+        return idx_nodes
 
     def compare_with_sample(self, sample):
         """ sample is a dict with dict of tables """
@@ -292,17 +297,21 @@ class SchemaNode:
         else:
             self.value = json_schema
 
-    def add_parent_references(self):
-        """ For every array node except root node add to self node references
-        to parent nodes """
+    def super_parent(self):
+        # get root for super parent (collection itself)
         root = [i for i in self.all_parents() \
                     if i.value == i.type_array and not i.parent][0]
+        return root
+
+    def add_parent_reference(self):
+        """ For every array node except root node add to self node references
+        to parent nodes """
+        root = self.super_parent()
         idnode = root.get_id_node()
+        # if self node is not a root and idnode is located
         if self.long_alias() != root.long_alias() and idnode:
             child = SchemaNode(self)
-            child.name = '_'.join([item.public_name() \
-                                   for item in idnode.all_parents() \
-                                   if item.name])
+            child.name = idnode.long_alias()
             child.value = idnode.value
             child.reference = idnode
             self.children.append(child)
@@ -405,9 +414,9 @@ class SchemaEngine:
         self.root_node.load(name, schema)
         for item in self.root_node.get_nested_array_type_nodes():
             if item.children[0].value == item.type_struct:
-                item.children[0].add_parent_references()
+                item.children[0].add_parent_reference()
             else:
-                item.add_parent_references()
+                item.add_parent_reference()
         self.schema = schema
 
     def locate(self, fields_list):
@@ -478,7 +487,14 @@ class DataEngine:
             for child in node.children:
                 if child.value == child.type_struct or \
                    child.value == child.type_array:
-                    if child.name in data:
+                    if type(data) is not dict and type(data) is not list:
+                        getLogger(__name__).warning(\
+                            'Wrong type %s for %s. Data is: %s' % \
+                                (str(type(data)),
+                                 node.long_alias(),
+                                 str(data)
+                                 ))
+                    elif child.name in data:
                         self.load_data_recursively(data[child.name], child)
         elif node.value == node.type_array and type(data) is list:
 #if expected and real types are the same
@@ -515,15 +531,17 @@ class DataEngine:
                     collection_name = parnode.all_parents()[0].name
                     fieldname = components[component_idx]
                     if type(curdata) is not dict and type(curdata) is not list:
-                        getLogger(__name__).error("collection=%s field=%s bad type=%s data=%s" % 
+                        getLogger(__name__).error("collection=%s %s, field=%s bad type=%s data=%s" % 
                                                   (collection_name,
+                                                   parnode.long_alias(),
                                                    fieldname,
                                                    str(type(curdata)),
                                                    str(curdata)))
                         getLogger(__name__).error("components=%s, idx=%d" % 
                                                   (str(components), 
                                                    component_idx))
-                    if fieldname in curdata.keys():
+                        curdata = None
+                    elif fieldname in curdata.keys():
                         curdata = curdata[fieldname]
                         component_idx += 1
                     else:
@@ -683,9 +701,15 @@ rows count %d and %d"
 
                 if not Tables.cmp_values(sqlcol.values, sqlcol2.values):
                     msg_fmt = "not equal: %s.%s column values val=%s, val2=%s"
-                    str_values = [str(i) for i in sqlcol.values ]
-                    str_values2 = [str(i) for i in sqlcol2.values ]
-                    getLogger(__name__).info(msg_fmt % (table_name, 
+                    try:
+                        str_values = [str(i) for i in sqlcol.values ]
+                        str_values2 = [str(i) for i in sqlcol2.values ]
+                    except:
+                        if not str_values:
+                            str_values = ['!!!!Exeption!!!!']
+                        if not str_values2:
+                            str_values2 = ['!!!!Exeption!!!!']
+                    getLogger(__name__).info(msg_fmt % (table_name,
                                                         sqlcol.name,
                                                         str_values,
                                                         str_values2))
