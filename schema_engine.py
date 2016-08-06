@@ -531,8 +531,9 @@ class DataEngine:
                     collection_name = parnode.all_parents()[0].name
                     fieldname = components[component_idx]
                     if type(curdata) is not dict and type(curdata) is not list:
-                        getLogger(__name__).error("collection=%s field=%s bad type=%s data=%s" % 
+                        getLogger(__name__).error("collection=%s %s, field=%s bad type=%s data=%s" % 
                                                   (collection_name,
+                                                   parnode.long_alias(),
                                                    fieldname,
                                                    str(type(curdata)),
                                                    str(curdata)))
