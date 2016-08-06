@@ -539,7 +539,8 @@ class DataEngine:
                         getLogger(__name__).error("components=%s, idx=%d" % 
                                                   (str(components), 
                                                    component_idx))
-                    if fieldname in curdata.keys():
+                        curdata = None
+                    elif fieldname in curdata.keys():
                         curdata = curdata[fieldname]
                         component_idx += 1
                     else:
