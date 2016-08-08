@@ -701,6 +701,8 @@ rows count %d and %d"
 
                 if not Tables.cmp_values(sqlcol.values, sqlcol2.values):
                     msg_fmt = "not equal: %s.%s column values val=%s, val2=%s"
+                    str_values = []
+                    str_values2 = []
                     try:
                         str_values = [str(i) for i in sqlcol.values ]
                         str_values2 = [str(i) for i in sqlcol2.values ]
