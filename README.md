@@ -5,3 +5,4 @@ This project provides:
 * module engine for load and transform raw mongo data into relational tables;
 
 Please note that most critical parts of module functionality are covered by tests.
+Test Coverage: 95%

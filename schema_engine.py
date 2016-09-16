@@ -726,7 +726,8 @@ rows count %d and %d"
                 "different tables tables=%s, data_tables=%s" % \
                 (sorted(self.tables.keys()), sorted(sample.keys()) ))
         for table_name, columns in sample.iteritems():
-            if not self.tables[table_name].compare_with_sample(sample):
+            if not table_name in self.tables or \
+                    not self.tables[table_name].compare_with_sample(sample):
                 res = False
         return res
 
