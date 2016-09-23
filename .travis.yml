@@ -1,0 +1,22 @@
+language: python
+python:
+  - "2.7"
+services:
+  - postgresql
+before_install:
+  - git clone https://github.com/YaroslavLitvinov/gizer $TRAVIS_BUILD_DIR/../gizer
+install:
+  - pip install -r requirements.txt
+  - pip install coveralls
+before_script:
+  - psql -c 'SHOW SERVER_VERSION' -U postgres
+  - psql -c 'create database etl;' -U postgres
+  - psql -c "CREATE USER etl WITH PASSWORD 'etl';" -U postgres 
+  - psql -c "CREATE SCHEMA test_schema AUTHORIZATION etl;" -U postgres
+  - export TEST_PSQLCONN="dbname=etl user=etl password=etl"
+  - export PYTHONPATH="$TRAVIS_BUILD_DIR/..:$TRAVIS_BUILD_DIR/../gizer"
+script:
+  - pushd $TRAVIS_BUILD_DIR/../gizer && py.test --cov=mongo_schema $TRAVIS_BUILD_DIR/tests/  $TRAVIS_BUILD_DIR/../gizer/tests
+  - popd
+after_success:
+  coveralls

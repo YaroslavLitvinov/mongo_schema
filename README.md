@@ -1,3 +1,5 @@
+[![Coverage Status](https://coveralls.io/repos/github/YaroslavLitvinov/mongo_schema/badge.svg?branch=master)](https://coveralls.io/github/YaroslavLitvinov/mongo_schema?branch=master)
+
 This project provides:
 * Utility for generating json schema from raw mongo data;
 * Utilities for merging and patching schemas;
