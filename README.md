@@ -1,3 +1,5 @@
+[![Coverage Status](https://coveralls.io/repos/github/YaroslavLitvinov/mongo_schema/badge.svg?branch=master)](https://coveralls.io/github/YaroslavLitvinov/mongo_schema?branch=master)
+
 This project provides:
 * Utility for generating json schema from raw mongo data;
 * Utilities for merging and patching schemas;
@@ -5,3 +7,4 @@ This project provides:
 * module engine for load and transform raw mongo data into relational tables;
 
 Please note that most critical parts of module functionality are covered by tests.
+Test Coverage: 95%
