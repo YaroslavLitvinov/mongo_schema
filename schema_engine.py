@@ -640,7 +640,10 @@ class Tables:
         id_node = self.schema_engine.root_node.get_id_node()
         sqlcol = self.tables[collection_name]\
             .sql_columns[id_node.short_alias()]
-        return sqlcol.values[0]
+        if sqlcol.values:
+            return sqlcol.values[0]
+        else:
+            return None
 
     @staticmethod
     def cmp_values(vallist1, vallist2):
