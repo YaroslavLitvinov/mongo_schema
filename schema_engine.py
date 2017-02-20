@@ -488,12 +488,13 @@ class DataEngine:
                 if child.value == child.type_struct or \
                    child.value == child.type_array:
                     if type(data) is not dict and type(data) is not list:
-                        getLogger(__name__).warning(\
-                            'Wrong type %s for %s. Data is: %s' % \
-                                (str(type(data)),
-                                 node.long_alias(),
-                                 str(data)
-                                 ))
+                        if data != None:
+                            getLogger(__name__).warning(\
+                                'Wrong type %s for %s. Data is: %s' % \
+                                    (str(type(data)),
+                                     node.long_alias(),
+                                     str(data)
+                                     ))
                     elif child.name in data:
                         self.load_data_recursively(data[child.name], child)
         elif node.value == node.type_array and type(data) is list:
@@ -530,7 +531,10 @@ class DataEngine:
                 else:
                     collection_name = parnode.all_parents()[0].name
                     fieldname = components[component_idx]
-                    if type(curdata) is not dict and type(curdata) is not list:
+                    if type(curdata) is dict and fieldname in curdata.keys():
+                        curdata = curdata[fieldname]
+                        component_idx += 1
+                    elif type(curdata) is not dict:
                         getLogger(__name__).error("collection=%s %s, field=%s bad type=%s data=%s" % 
                                                   (collection_name,
                                                    parnode.long_alias(),
@@ -541,9 +545,6 @@ class DataEngine:
                                                   (str(components), 
                                                    component_idx))
                         curdata = None
-                    elif fieldname in curdata.keys():
-                        curdata = curdata[fieldname]
-                        component_idx += 1
                     else:
                         curdata = None
 
