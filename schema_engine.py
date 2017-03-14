@@ -594,8 +594,8 @@ def load_table_callback(tables, node):
                 coltype = column.typo
                 if valtype == 'STRING':
                     colval = ''
-                error = "wrong value %s(%s) for %s(%s)" % \
-                            (str(colval), valtype, colname, coltype)
+                error = "wrong value (%s) for %s(%s)" % \
+                            (valtype, colname, coltype)
                 if error in tables.errors.keys():
                     tables.errors[error] += 1
                 else:
