@@ -111,7 +111,7 @@ def check_comments_table(tables):
     sqltable = tables.tables["a_insert_comments"]
     check_one_column(sqltable, 'id_oid', ['56b8f05cf9fcee1b00000110',\
                                           '56b8f05cf9fcee1b00000011'])
-    check_one_column(sqltable, 'body', ['body3', 'body2'])
+    check_one_column(sqltable, 'body', [None, 'body2'])
     check_one_column(sqltable, 'idx', [1, 2])
     assert('a_inserts_idx' not in sqltable.sql_columns)
     # check indexes
