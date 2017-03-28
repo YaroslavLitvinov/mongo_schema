@@ -582,12 +582,8 @@ def load_table_callback(tables, node):
                     or colval is None \
                     or (valtype == 'INT' and coltype == 'DOUBLE'):
                 column.values.append(colval)
-            elif (type(colval) is list and coltype == 'TINYINT') \
-                    or (type(colval) is dict and coltype == 'TINYINT'):
+            elif type(colval) is dict or type(colval) is list:
                 column.values.append(None)
-            elif (type(colval) is list and coltype == 'STRING') \
-                    or (type(colval) is dict and coltype == 'STRING'):
-                column.values.append('')
             else:
                 column.values.append(None)
                 colname = column.node.long_alias(delimeter='.')
